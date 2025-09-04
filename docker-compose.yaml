@@ -9,6 +9,7 @@ x-airflow-common: &airflow-common
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./duckdb:/opt/airflow/duckdb
+    - ./data:/opt/airflow/data
     - ./warehouse:/opt/airflow/warehouse
     - ./exports:/opt/airflow/exports
 
