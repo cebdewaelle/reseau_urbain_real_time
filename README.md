@@ -23,6 +23,18 @@ docker compose -f docker-compose.yaml --env-file .env.dev run airflow-webserver 
 docker compose -f docker-compose.yaml --env-file .env.dev up -d
 
 
+## Remplacer les ${} par les valeurs du .env
+# création de l'utilisateur POSTGRES_USER_RESEAU
+CREATE USER ${POSTGRES_USER_RESEAU} WITH PASSWORD '${POSTGRES_PASSWORD}';
+
+# création de la base POSTGRES_DB_RESEAU
+CREATE DATABASE ${POSTGRES_DB_RESEAU} OWNER ${POSTGRES_USER_RESEAU};
+
+# affectation des droits
+GRANT ALL PRIVILEGES ON DATABASE ${POSTGRES_DB_RESEAU} TO ${POSTGRES_USER_RESEAU};
+
+
+
 # accéder au conteneur duckdb
 docker compose -f docker-compose.yaml --env-file .env.dev exec duckdb duckdb /data/reseau_urbain.duckdb
 
@@ -39,3 +51,6 @@ INSERT INTO test (id, name_t) VALUES (2, '2test');
 INSERT INTO test (id, name_t) VALUES (3, 'test');
 
 # QUITTER LE CONTENEUR DUCKDB POUR "LIBERER" le fichier ma_database.duckdb avec un double ctrl-c
+
+
+

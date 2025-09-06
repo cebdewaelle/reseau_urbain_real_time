@@ -74,4 +74,5 @@ services:
 
 
 volumes:
-  postgres_data:
+  - postgres_data:
+  - ./db/init-multiple-db.sh:/docker-entrypoint-initdb.d/init-multiple-db.sh
