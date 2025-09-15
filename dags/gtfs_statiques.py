@@ -7,8 +7,7 @@ import os
 import pandas as pd
 import requests
 import zipfile
-from dags.src.common import retourne_jour
-from src.fonctions_statiques import persist_et_supprime
+from commun.fonctions import retourne_jour, init_gtfs
 
 
 BASEDIR_IN = "/opt/airflow/data/in/"
@@ -18,17 +17,8 @@ URL_STABLE = (
 )
 
 
-def retourne_jour() -> str:
-    return date.today().strftime("%Y%m%d")
-
-
 rep_jour = os.path.join(BASEDIR_IN, retourne_jour())
 rep_gtfs = os.path.join(rep_jour, "gtfs")
-
-
-def init_gtfs():
-    os.makedirs(rep_jour, exist_ok=True)
-    os.makedirs(rep_gtfs, exist_ok=True)
 
 
 def download_gtfs():
@@ -121,6 +111,7 @@ with DAG(
     t_init = PythonOperator(
         task_id="init_gtfs",
         python_callable=init_gtfs,
+        op_args=[rep_jour, rep_gtfs],
     )
     t_download = PythonOperator(
         task_id="download_gtfs",
