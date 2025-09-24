@@ -76,7 +76,7 @@ def fetch_gtfs_rt(**context):
                     if stu.HasField("arrival") and stu.arrival.HasField("time"):
                         realtime_arrival = datetime.fromtimestamp(stu.arrival.time)
                         realtime_arrival = realtime_arrival.astimezone(gtfs_tz)
-                        # now_local = gtfs_tz.localize(datetime.now())
+                        # now_local = datetime.now(gtfs_tz)
                         records.append(
                             {
                                 "trip_id": trip_id,
@@ -98,7 +98,7 @@ def fetch_gtfs_rt(**context):
             realtime_df.to_sql("rt_temp", engine, if_exists="replace", index=False)
             print(f"Données RT stockées en base: {len(records)} records")
 
-            return len(records)  # Retourner le nombre d'enregistrements
+            return len(records)
         else:
             print("Aucune donnée RT trouvée")
             return 0
@@ -120,13 +120,15 @@ def enrich_with_static(**context):
         realtime_df = pd.read_sql("SELECT * FROM rt_temp", conn)
 
         stop_times = pd.read_sql(
-            "SELECT trip_id, stop_id, arrival_time FROM stop_times", conn
+            "SELECT trip_id, stop_id, arrival_time, stop_sequence FROM stop_times", conn
         )
         # stop.name route.route_long_name
 
         routes = pd.read_sql("SELECT route_id, route_long_name FROM routes", conn)
 
-        stops = pd.read_sql("SELECT stop_id, stop_name FROM stops", conn)
+        stops = pd.read_sql(
+            "SELECT stop_id, stop_name, stop_lat, stop_lon FROM stops", conn
+        )
 
     # Convertir realtime_arrival en datetime si ce n'est pas déjà fait
     realtime_df["realtime_arrival"] = pd.to_datetime(realtime_df["realtime_arrival"])
@@ -139,7 +141,7 @@ def enrich_with_static(**context):
     stop_times["stop_id"] = stop_times["stop_id"].astype(str)
 
     # Date du service (aujourd'hui en local)
-    service_date = gtfs_tz.localize(datetime.now()).date()
+    service_date = datetime.now(gtfs_tz).date()
 
     # Conversion des temps GTFS en datetime timezone
     def convert_gtfs_time(time_str):
@@ -149,7 +151,7 @@ def enrich_with_static(**context):
 
     merged = pd.merge(
         realtime_df,
-        stop_times[["trip_id", "stop_id", "planned_arrival"]],
+        stop_times[["trip_id", "stop_id", "planned_arrival", "stop_sequence"]],
         on=["trip_id", "stop_id"],
         how="left",
     )
@@ -161,12 +163,13 @@ def enrich_with_static(**context):
     )
     merged3 = pd.merge(
         merged2,
-        stops[["stop_id", "stop_name"]],
+        stops[["stop_id", "stop_name", "stop_lat", "stop_lon"]],
         on=["stop_id"],
         how="left",
     )
 
-    merged = merged3
+    merged = merged3.dropna(subset=["route_long_name"])
+    merged = merged[merged["route_long_name"].str.strip() != ""]
 
     # Calcul du retard en secondes
     merged["delay"] = (
@@ -201,7 +204,7 @@ def export_csv_data(**context):
     with engine.connect() as conn:
         anomalies_df = pd.read_sql("SELECT * FROM anomalies", conn)
 
-    now_local = gtfs_tz.localize(datetime.now())
+    now_local = datetime.now(gtfs_tz)
     now_str = now_local.strftime("%Y%m%d_%H%M%S")
 
     nomfic_export = os.path.join(BASEDIR_OUT, "current_data.csv")
@@ -214,9 +217,62 @@ def export_csv_data(**context):
     return f"Fichier archivé: {nomfic_archive}"
 
 
+def export_csv_mean_delays(**context):
+    nomfic_import = os.path.join(BASEDIR_OUT, "current_data.csv")
+
+    now_local = datetime.now(gtfs_tz)
+    today_str = now_local.strftime("%Y%m%d")
+    time_str = now_local.strftime("%H:%M:%S")
+
+    df = pd.read_csv(nomfic_import, sep=";")
+
+    mean_delay = df["delay"].mean()
+
+    print(f"delai global moyen: {mean_delay}")
+
+    dict_now_stats = {"execution_date": time_str, "delai_moyen": mean_delay}
+    df_now_stats = pd.DataFrame.from_records([dict_now_stats])
+
+    nomfic_export = os.path.join(BASEDIR_OUT, f"global_delays_{today_str}.csv")
+    if not os.path.exists(nomfic_export):
+        df_stats = df_now_stats
+    else:
+        df_stats = pd.read_csv(nomfic_export, sep=";")
+        df_stats = pd.concat([df_stats, df_now_stats], ignore_index=True)
+
+    print(f"stats: {df_stats}")
+    df_stats.to_csv(nomfic_export, ";", index=False)
+    return f"Fichier mis à jour: {nomfic_export}"
+
+
+def export_csv_mean_route_delays(**context):
+    nomfic_import = os.path.join(BASEDIR_OUT, "current_data.csv")
+
+    now_local = datetime.now(gtfs_tz)
+    today_str = now_local.strftime("%Y%m%d")
+    time_str = now_local.strftime("%H:%M:%S")
+
+    df = pd.read_csv(nomfic_import, sep=";")
+
+    df_by_route = df.groupby("route_id")["delay"].mean().reset_index()
+    df_by_route["execution_date"] = time_str
+    df_by_route = df_by_route[["execution_date", "route_id", "delay"]]
+    df_by_route.rename(columns={"delay": "delai_moyen"}, inplace=True)
+
+    nomfic_export = os.path.join(BASEDIR_OUT, f"delays_routes_{today_str}.csv")
+    if not os.path.exists(nomfic_export):
+        df_stats = df_by_route
+    else:
+        df_stats = pd.read_csv(nomfic_export, sep=";")
+        df_stats = pd.concat([df_stats, df_by_route], ignore_index=True)
+
+    df_stats.to_csv(nomfic_export, ";", index=False)
+    return f"Fichier mis à jour: {nomfic_export}"
+
+
 with DAG(
     "gtfs_realtime",
-    schedule_interval="*/30 * * * *",  # toutes les 30 minutes
+    schedule_interval="*/5 * * * *",
     start_date=pendulum.datetime(2025, 9, 6, tz="UTC"),
     catchup=False,
     tags=["gtfs", "realtime"],
@@ -240,4 +296,16 @@ with DAG(
         provide_context=True,
     )
 
-    fetch >> enrich >> export
+    stats = PythonOperator(
+        task_id="export_csv_mean_delays",
+        python_callable=export_csv_mean_delays,
+        provide_context=True,
+    )
+
+    stats_delais = PythonOperator(
+        task_id="export_csv_mean_route_delays",
+        python_callable=export_csv_mean_route_delays,
+        provide_context=True,
+    )
+
+    fetch >> enrich >> export >> stats >> stats_delais
