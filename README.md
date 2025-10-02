@@ -1,8 +1,30 @@
 # reseau_urbain_real_time
 Traitement des données en temps réel d'un réseau de transport urbain
 
-Commandes d'initialisation d'airflow
 
+
+
+# exemple de fichier .env (nommé .env.dev)
+# Postgres
+POSTGRES_USER_AIRFLOW=airflow_user
+POSTGRES_PASSWORD=motdepasse
+POSTGRES_DB_AIRFLOW=airflow_db
+POSTGRES_USER_RESEAU=reseau_user
+POSTGRES_DB_RESEAU=reseau_db
+
+# pgAdmin
+PGADMIN_DEFAULT_EMAIL=mon_email@example.com
+PGADMIN_DEFAULT_PASSWORD=motdepasse
+
+# Airflow
+AIRFLOW__CORE__EXECUTOR=LocalExecutor
+AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER_AIRFLOW}:${POSTGRES_PASSWORD}@psql_dev:5432/${POSTGRES_DB_AIRFLOW}
+AIRFLOW__CORE__FERNET_KEY=AAAAA11111AAAAA11111AAAAA11111AAAAA11111AAA=
+AIRFLOW__WEBSERVER__SECRET_KEY=11111AAAAA11111AAAAA11111AAAAA11
+
+
+
+Commandes d'initialisation d'airflow
 
 docker compose -f docker-compose.yaml --env-file .env.dev build
 docker compose -f docker-compose.yaml --env-file .env.dev up -d
@@ -34,23 +56,6 @@ CREATE DATABASE ${POSTGRES_DB_RESEAU} OWNER ${POSTGRES_USER_RESEAU};
 GRANT ALL PRIVILEGES ON DATABASE ${POSTGRES_DB_RESEAU} TO ${POSTGRES_USER_RESEAU};
 
 
-
-# accéder au conteneur duckdb
-docker compose -f docker-compose.yaml --env-file .env.dev exec duckdb duckdb /data/reseau_urbain.duckdb
-
-# création d'une table test dans le conteneur duckdb (qui va créer le fichier ma_database.duckdb)
-CREATE TABLE reseau_urbain.main.test (
-	id integer NOT NULL,
-	name_t varchar(100) NOT NULL,
-	CONSTRAINT test_pk PRIMARY KEY (id)
-);
-
-# insertion de quelques lignes dans la table test
-INSERT INTO test (id, name_t) VALUES (1, '1test1');
-INSERT INTO test (id, name_t) VALUES (2, '2test');
-INSERT INTO test (id, name_t) VALUES (3, 'test');
-
-# QUITTER LE CONTENEUR DUCKDB POUR "LIBERER" le fichier ma_database.duckdb avec un double ctrl-c
-
+# créer une base de données qui contiendra les données métier
 
 
