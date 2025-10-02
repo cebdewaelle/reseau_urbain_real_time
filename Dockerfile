@@ -1,0 +1,3 @@
+FROM apache/airflow:2.10.2-python3.9
+
+RUN pip install --upgrade psycopg2-binary duckdb pandas pyarrow requests gtfs-realtime-bindings

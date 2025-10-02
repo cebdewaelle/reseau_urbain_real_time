@@ -1,0 +1,89 @@
+from dash import Dash, html, dcc, callback, Output, Input, dash_table
+import plotly.express as px
+import pandas as pd
+import os
+import pytz
+from datetime import datetime
+
+BASEDIR_OUT = "./data/out/"
+nomfic_export = os.path.join(BASEDIR_OUT, "current_data.csv")
+
+
+df_ano = pd.read_csv(nomfic_export, delimiter=";")
+
+app = Dash()
+
+# Requires Dash 2.17.0 or later
+# app.layout = [
+#     html.H1(children="Anomalies de retard", style={"textAlign": "center"}),
+#     dcc.Dropdown(df.country.unique(), "Canada", id="dropdown-selection"),
+#     dcc.Graph(id="graph-content"),
+# ]
+
+# @callback(Output("graph-content", "figure"), Input("dropdown-selection", "value"))
+# def update_graph(value):
+#     dff = df[df.country == value]
+#     return px.line(dff, x="year", y="pop")
+
+
+# # Incorporate data
+# df = pd.read_csv(
+#     "https://raw.githubusercontent.com/plotly/datasets/master/gapminder2007.csv"
+# )
+
+# # Initialize the app
+# app = Dash()
+
+# # App layout
+# app.layout = [
+#     html.Div(children="My First App with Data"),
+#     dash_table.DataTable(data=df.to_dict("records"), page_size=10),
+# ]
+
+# # Run the app
+# if __name__ == "__main__":
+#     app.run(debug=True)
+
+route_options = [{"label": i, "value": i} for i in df_ano["route_id"].unique()]
+
+app.layout = [
+    html.H1(children="Anomalies de retard", style={"textAlign": "center"}),
+    dcc.Dropdown(df_ano["route_id"].unique(), id="route_dropdown", multi=True),
+    dcc.Dropdown(df_ano["trip_id"].unique(), id="trip_dropdown", multi=True),
+    dash_table.DataTable(id="table", data=df_ano.to_dict("records"), page_size=10),
+    # dcc.t.Graph(id="graph-content"),
+]
+
+
+# @callback(
+#     Output(component_id="trip_dropdown", component_property="value"),
+#     Input(component_id="route_dropdown", component_property="value"),
+# )
+# def update_trip_dropdown(route_dropdown):
+#     if route_dropdown:
+#         dff = df_ano[df_ano["route_id"].isin(route_dropdown)]
+#     else:
+#         dff = df_ano.copy()
+#     return dff.to_dict("records")
+
+
+# @callback(
+#     Output(component_id="table", component_property="data"),
+#     Input(component_id="route_dropdown", component_property="value"),
+#     Input(component_id="trip_dropdown", component_property="value"),
+# )
+# def update_table_component(route_dropdown, trip_dropdown):
+#     if trip_dropdown:
+#         dff = df_ano[df_ano["trip_id"].isin(trip_dropdown)]
+#     else:
+#         dff = df_ano.copy()
+
+#     if route_dropdown:
+#         dfff = dff[dff["route_id"].isin(route_dropdown)]
+#     else:
+#         dfff = dff.copy()
+#     return dfff.to_dict("records")
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
